@@ -1,210 +1,107 @@
-Welcome to your new TanStack Start app!
+# webdev-todo
 
-# Getting Started
+A simple [TanStack Start](https://tanstack.com/start) example that uses [Drizzle ORM](https://orm.drizzle.team/) with a PostgreSQL database running in a Docker container.
 
-To run this application:
+The application is a simple Todo app: you can **add**, **edit**, **delete** and mark todos as complete. It demonstrates:
+
+- **TanStack Router capabilities**: file-based routing, dynamic route params, route loaders, type-safe links and server functions.
+- **Client-only components** that persist state in the browser's `localStorage`.
+
+## Tech stack
+
+- [TanStack Start](https://tanstack.com/start) / [TanStack Router](https://tanstack.com/router)
+- [Drizzle ORM](https://orm.drizzle.team/) + `node-postgres`
+- PostgreSQL 17 (Docker)
+- React 19, Tailwind CSS 4, [shadcn/ui](https://ui.shadcn.com/)
+- Zod for validating server function input
+
+## Getting started
+
+### 1. Configure the environment
+
+Create a `.env` file in the project root:
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=todos
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/todos
+```
+
+### 2. Start PostgreSQL in Docker
 
 ```bash
-npm install
-npm run dev
+docker compose up -d
 ```
 
-# Building For Production
+This starts a `postgres:17.0` container (see [docker-compose.yaml](docker-compose.yaml)) and stores its data in the `pgdata` volume.
 
-To build this application for production:
+### 3. Install dependencies and set up the database
 
 ```bash
-npm run build
+bun install
+bun run db:migrate   # apply the migrations in ./drizzle
 ```
 
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
-
-
-## Deploy with Nitro
-
-This project uses Nitro as a generic server adapter, so it can run on any Node-compatible host.
+### 4. Run the app
 
 ```bash
-npm run build
-node .output/server/index.mjs
+bun run dev
 ```
 
-The build output is a self-contained Node server. To deploy, push the `.output/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
+Then open http://localhost:3000.
 
-For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
+## Project structure
 
+```
+src/
+├── db/
+│   ├── schema.ts               # Drizzle schema (todos table)
+│   └── index.ts                # Drizzle client
+├── components/
+│   ├── todo-form.tsx           # Add/edit form + server functions
+│   ├── local-count-button.tsx  # Client-only component using localStorage
+│   └── ui/                     # shadcn/ui components
+└── routes/
+    ├── __root.tsx              # Root document/layout
+    ├── index.tsx               # "/" – todo list, toggle and delete
+    └── todos/
+        ├── new/index.tsx       # "/todos/new" – add a todo
+        └── $id/edit/index.tsx  # "/todos/$id/edit" – edit a todo
+```
 
-## Shadcn
+## What it demonstrates
 
-Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
+### TanStack Router
+
+- **File-based routing**: routes live in `src/routes`. The route tree (`src/routeTree.gen.ts`) is generated automatically.
+- **Dynamic params**: `/todos/$id/edit` reads `params.id` in its loader to fetch one todo, and throws `notFound()` if there's no todo with that id.
+- **Route loaders**: the `/` route loads all todos before rendering. Components read the data with `Route.useLoaderData()`.
+- **Type-safe navigation**: `<Link to="/todos/$id/edit" params={{ id }}>` is checked against the generated route tree.
+- **Server functions**: `createServerFn` with Zod validators handles create, update, toggle and delete directly against Postgres. Mutations either `throw redirect({ to: "/" })` or call `router.invalidate()` to reload loader data.
+
+### Client-only components with localStorage
+
+[local-count-button.tsx](src/components/local-count-button.tsx) shows how to use browser-only APIs in a server-rendered app:
+
+- `<ClientOnly>` (from `@tanstack/react-router`) renders its children only on the client, so `localStorage` is never accessed during SSR.
+- `createClientOnlyFn` (from `@tanstack/react-start`) wraps the function that reads the stored count, so it can only run in the browser.
+- A `useEffect` writes the counter back to `localStorage`, so the value is still there after a page reload.
+
+## Database scripts
+
+| Script                | Description                              |
+| --------------------- | ---------------------------------------- |
+| `bun run db:generate` | Generate migrations from the schema      |
+| `bun run db:migrate`  | Apply migrations                         |
+| `bun run db:push`     | Push the schema directly to the database |
+| `bun run db:studio`   | Open Drizzle Studio                      |
+
+## Building for production
 
 ```bash
-pnpm dlx shadcn@latest add button
+bun run build
+bun .output/server/index.mjs
 ```
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
